@@ -25,6 +25,7 @@
 #include <profapi.h>
 #include <sqlite3.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "config/files.h"
 
@@ -34,6 +35,7 @@
 static char *_get_db_filename (const char *const fulljid);
 static char *_log_database_clear (const char *const fulljid);
 static void _log_database_close (sqlite3 *g_chatlog_database);
+static char *_get_barejid_from_full_jid (const char *const full_jid);
 
 void
 prof_init (const char *const version, const char *const status,
@@ -58,8 +60,18 @@ prof_on_shutdown (void)
 void
 prof_on_disconnect (const char *const account_name, const char *const fulljid)
 {
+  char *barejid = NULL;
+
+  if (_get_barejid_from_full_jid (fulljid))
+    {
+      asprintf (&barejid, "%s", _get_barejid_from_full_jid (fulljid));
+    }
+  else
+    {
+      asprintf (&barejid, "%s", fulljid);
+    }
   char *s = NULL;
-  char *result = _log_database_clear (account_name);
+  char *result = _log_database_clear (barejid);
   asprintf (&s, "%s", result);
   prof_cons_show (s);
 }
@@ -71,6 +83,25 @@ prof_on_unload (void)
   asprintf (&s, "Unloading Plugin %s %s", PLUGIN_NAME, PLUGIN_VERSION);
   prof_cons_show (s);
   free (s);
+}
+
+static char *
+_get_barejid_from_full_jid (const char *const full_jid)
+{
+  char **tokens = g_strsplit (full_jid, "/", 0);
+  char *barejid = NULL;
+
+  if (tokens)
+    {
+      if (tokens[0] && tokens[1])
+        {
+          barejid = strdup (tokens[0]);
+        }
+
+      g_strfreev (tokens);
+    }
+
+  return barejid;
 }
 
 static char *
@@ -94,14 +125,17 @@ _log_database_clear (const char *const fulljid)
 
   ret = sqlite3_open_v2 (filename, &g_chatlog_database, SQLITE_OPEN_READWRITE,
                          NULL);
-  free (filename);
+
   if (ret != SQLITE_OK)
     {
       const char *err_msg = sqlite3_errmsg (g_chatlog_database);
       char *s = NULL;
-      asprintf (&s, "Error opening SQLite database: %s", err_msg);
+      asprintf (&s, "Error opening SQLite «%s» database: %s", filename,
+                err_msg);
+      free (filename);
       return s;
     }
+  free (filename);
 
   char *err_msg;
   char *query = "DELETE FROM ChatLogs";
