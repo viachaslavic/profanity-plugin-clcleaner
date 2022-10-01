@@ -1,3 +1,5 @@
+# ChatLogs cleaner for profanity
+
 ## About
 
 At current time (v. 0.13.0) profanity don't provide an opportunity to disable a chatlogs.
