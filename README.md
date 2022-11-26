@@ -1,4 +1,6 @@
-# ChatLogs cleaner for profanity
+# clcleaner
+
+Plugin for [profanity IM](https://profanity-im.github.io) which cleans the chatlogs.
 
 ## About
 
