@@ -22,6 +22,7 @@
 
 #define _GNU_SOURCE
 
+#include <assert.h>
 #include <profapi.h>
 #include <sqlite3.h>
 #include <stdio.h>
@@ -32,7 +33,7 @@
 #define PLUGIN_NAME "clcleaner"
 #define PLUGIN_VERSION "0.0.1"
 
-static char *_get_db_filename (const char *const fulljid);
+static gchar *_get_db_filename (const char *const fulljid);
 static char *_log_database_clear (const char *const fulljid);
 static void _log_database_close (sqlite3 *g_chatlog_database);
 static char *_get_barejid_from_full_jid (const char *const full_jid);
@@ -41,6 +42,7 @@ void
 prof_init (const char *const version, const char *const status,
            const char *const account_name, const char *const fulljid)
 {
+  assert (version && status && account_name && fulljid);
   char *s = NULL;
   asprintf (&s, "Loaded Plugin %s %s", PLUGIN_NAME, PLUGIN_VERSION);
   prof_cons_show (s);
@@ -60,6 +62,7 @@ prof_on_shutdown (void)
 void
 prof_on_disconnect (const char *const account_name, const char *const fulljid)
 {
+  assert (account_name);
   char *barejid = NULL;
 
   if (_get_barejid_from_full_jid (fulljid))
@@ -104,7 +107,7 @@ _get_barejid_from_full_jid (const char *const full_jid)
   return barejid;
 }
 
-static char *
+static gchar *
 _get_db_filename (const char *const fulljid)
 {
   return files_file_in_account_data_path (DIR_DATABASE, fulljid, "chatlog.db");
@@ -116,11 +119,10 @@ _log_database_clear (const char *const fulljid)
   sqlite3 *g_chatlog_database;
   int ret = sqlite3_initialize ();
 
-  char *filename = _get_db_filename (fulljid);
+  gchar *filename = _get_db_filename (fulljid);
   if (!filename)
     {
-      char *s = "Cannot get filename";
-      return s;
+      return "Cannot get filename";
     }
 
   ret = sqlite3_open_v2 (filename, &g_chatlog_database, SQLITE_OPEN_READWRITE,
@@ -132,27 +134,32 @@ _log_database_clear (const char *const fulljid)
       char *s = NULL;
       asprintf (&s, "Error opening SQLite «%s» database: %s", filename,
                 err_msg);
-      free (filename);
+      g_free (filename);
       return s;
     }
-  free (filename);
+  g_free (filename);
 
   char *err_msg;
-  char *query = "DELETE FROM ChatLogs";
-  if (SQLITE_OK != sqlite3_exec (g_chatlog_database, query, NULL, 0, &err_msg))
+  char *queries[] = { "DELETE FROM ChatLogs", "VACUUM" };
+  for (size_t i = 0; i < sizeof (queries) / sizeof (queries[0]); i++)
     {
-      char *s = NULL;
-      if (err_msg)
+      char *query = queries[i];
+      if (SQLITE_OK
+          != sqlite3_exec (g_chatlog_database, query, NULL, 0, &err_msg))
         {
-          asprintf (&s, "SQLite error: %s", err_msg);
-          sqlite3_free (err_msg);
+          char *s = NULL;
+          if (err_msg)
+            {
+              asprintf (&s, "SQLite error: %s", err_msg);
+              sqlite3_free (err_msg);
+            }
+          else
+            {
+              asprintf (&s, "Unknown SQLite error");
+            }
+          _log_database_close (g_chatlog_database);
+          return s;
         }
-      else
-        {
-          asprintf (&s, "Unknown SQLite error");
-        }
-      _log_database_close (g_chatlog_database);
-      return s;
     }
   _log_database_close (g_chatlog_database);
 

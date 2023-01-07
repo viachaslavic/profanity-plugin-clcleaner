@@ -5,10 +5,15 @@ else
     LINK_FLAGS := -shared -fpic
 endif
 
-CFLAGS=-D_DEFAULT_SOURCE -fpic -g3 -O0 -std=c99 -Wall -Wextra -pedantic -Wno-unused-parameter  $(shell pkg-config --cflags glib-2.0) -c
+CFLAGS=-D_DEFAULT_SOURCE -fpic -std=c99 -Wall -Wextra -pedantic -Wno-unused-parameter  $(shell pkg-config --cflags glib-2.0) -c
 LDFLAGS=$(shell pkg-config --libs glib-2.0) -lprofanity
 
+all: CFLAGS += -DNDEBUG -g0 -O3
+all: LDFLAGS += -s
 all: clcleaner.so
+
+debug: CFLAGS += -g3 -O0
+debug: clcleaner.so
 
 %.so:%.o
 	$(CC) $(LINK_FLAGS) $(LDFLAGS) -o $@ $^
